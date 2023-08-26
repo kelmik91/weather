@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type WeatherJson struct {
+type weatherJson struct {
 	Latitude             float64 `json:"latitude"`
 	Longitude            float64 `json:"longitude"`
 	GenerationtimeMs     float64 `json:"generationtime_ms"`
@@ -75,14 +75,15 @@ var weatherCode = map[int]string{
 	99: "⚡🧊🧊⚡Гроза с сильным градом ⚡🧊🧊⚡",
 }
 
-func Weather(latitude, longitude float64, forecastDays string) (string, error) {
-	if forecastDays == "" {
+func Weather(latitude, longitude float64, forecastDays uint8) (string, error) {
+	if forecastDays == 0 {
 		return "", errors.New("forecastDays is empty")
 	}
 	latitudeStr := fmt.Sprint(latitude)
 	longitudeStr := fmt.Sprint(longitude)
+	forecastDaysStr := fmt.Sprint(forecastDays)
 
-	get, err := http.Get("https://api.open-meteo.com/v1/forecast?latitude=" + latitudeStr + "&longitude=" + longitudeStr + "&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset&current_weather=true&windspeed_unit=ms&timeformat=unixtime&timezone=Europe%2FMoscow&forecast_days=" + forecastDays)
+	get, err := http.Get("https://api.open-meteo.com/v1/forecast?latitude=" + latitudeStr + "&longitude=" + longitudeStr + "&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset&current_weather=true&windspeed_unit=ms&timeformat=unixtime&timezone=Europe%2FMoscow&forecast_days=" + forecastDaysStr)
 	if err != nil {
 		log.Fatal(err.Error())
 		return "", err
@@ -96,7 +97,7 @@ func Weather(latitude, longitude float64, forecastDays string) (string, error) {
 	}(get.Body)
 
 	getResp, _ := io.ReadAll(get.Body)
-	weather := WeatherJson{}
+	weather := weatherJson{}
 	err = json.Unmarshal(getResp, &weather)
 	if err != nil {
 		log.Fatal(err)
@@ -118,7 +119,7 @@ func Weather(latitude, longitude float64, forecastDays string) (string, error) {
 	message += "Закат: " + fmt.Sprint(sunset.Format("15:04")) + " \n"
 	message += "Световой день: " + fmt.Sprint(sunset.Sub(sunrise))
 
-	if time.Now().In(loc).Hour() == 18 {
+	if time.Now().In(loc).Hour() >= 18 {
 
 		sunriseTomorrow := time.Unix(int64(weather.Daily.Sunrise[1]), 0)
 		sunsetTomorrow := time.Unix(int64(weather.Daily.Sunset[1]), 0)
