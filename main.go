@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -44,6 +45,13 @@ type weatherJson struct {
 	} `json:"daily"`
 }
 
+type Config struct {
+	latitude     float64
+	longitude    float64
+	forecastDays uint8
+	tomorrow     bool
+}
+
 var weatherCode = map[int]string{
 	0:  "☀️Чистое небо ☀️",
 	1:  "☀️ В основном ясно ☀️",
@@ -75,15 +83,31 @@ var weatherCode = map[int]string{
 	99: "⚡🧊🧊⚡Гроза с сильным градом ⚡🧊🧊⚡",
 }
 
-func Weather(latitude, longitude float64, forecastDays uint8) (string, error) {
-	if forecastDays == 0 {
+func Weather(config Config) (string, error) {
+	if config.forecastDays == 0 {
 		return "", errors.New("forecastDays is empty")
 	}
-	latitudeStr := fmt.Sprint(latitude)
-	longitudeStr := fmt.Sprint(longitude)
-	forecastDaysStr := fmt.Sprint(forecastDays)
 
-	get, err := http.Get("https://api.open-meteo.com/v1/forecast?latitude=" + latitudeStr + "&longitude=" + longitudeStr + "&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset&current_weather=true&windspeed_unit=ms&timeformat=unixtime&timezone=Europe%2FMoscow&forecast_days=" + forecastDaysStr)
+	builder := &strings.Builder{}
+	builder.WriteString("https://api.open-meteo.com/v1/forecast?")
+
+	builder.WriteString("latitude=")
+	builder.WriteString(fmt.Sprint(config.latitude))
+
+	builder.WriteString("&longitude=")
+	builder.WriteString(fmt.Sprint(config.longitude))
+
+	builder.WriteString("&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset")
+
+	builder.WriteString("&current_weather=true")
+	builder.WriteString("&windspeed_unit=ms")
+	builder.WriteString("&timeformat=unixtime")
+	builder.WriteString("&timezone=Europe%2FMoscow")
+
+	builder.WriteString("&forecast_days=")
+	builder.WriteString(fmt.Sprint(config.forecastDays))
+
+	get, err := http.Get(builder.String())
 	if err != nil {
 		log.Fatal(err.Error())
 		return "", err
@@ -119,7 +143,7 @@ func Weather(latitude, longitude float64, forecastDays uint8) (string, error) {
 	message += "Закат: " + fmt.Sprint(sunset.Format("15:04")) + " \n"
 	message += "Световой день: " + fmt.Sprint(sunset.Sub(sunrise))
 
-	if time.Now().In(loc).Hour() >= 18 {
+	if (time.Now().In(loc).Hour() >= 18 && config.forecastDays >= 2) || (config.tomorrow && config.forecastDays >= 2) {
 
 		sunriseTomorrow := time.Unix(int64(weather.Daily.Sunrise[1]), 0)
 		sunsetTomorrow := time.Unix(int64(weather.Daily.Sunset[1]), 0)
